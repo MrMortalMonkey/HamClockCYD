@@ -21,6 +21,7 @@
  * Using library Hash at version 3.3.7
  */
 
+#include "CYD_User_Setup.h"
 #include <lvgl.h>
 #include "screens.h"
 #include "ui.h"
@@ -126,10 +127,12 @@ uint16_t touchScreenMinimumX = 200, touchScreenMaximumX = 3700, touchScreenMinim
 BME280 bme280;
 DS3232RTC RTClock;
 
-#define TFT_HOR_RES 240
-#define TFT_VER_RES 320
+#define TFT_HOR_RES 320
+#define TFT_VER_RES 240
 
 #define DRAW_BUF_SIZE (TFT_HOR_RES * TFT_VER_RES / 10 * (LV_COLOR_DEPTH / 8))
+
+TFT_eSPI tft = TFT_eSPI(TFT_HOR_RES, TFT_VER_RES);
 
 /*
  * Function reads touchscreen and maps to display coordinates
@@ -242,6 +245,23 @@ uint8_t *draw_buf;      //draw_buf is allocated on heap otherwise the static are
 uint32_t lastTick = 0;  //Used to track the tick timer
 
 /*
+ * LVGL display flush callback for the ESP32-2432S028 CYD ILI9341 display.
+ * The last argument to pushColors swaps RGB565 bytes for SPI, matching LVGL 9's
+ * TFT_eSPI helper without relying on the global LV_USE_TFT_ESPI driver.
+ */
+void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
+  uint32_t width = area->x2 - area->x1 + 1;
+  uint32_t height = area->y2 - area->y1 + 1;
+
+  tft.startWrite();
+  tft.setAddrWindow(area->x1, area->y1, width, height);
+  tft.pushColors((uint16_t *)px_map, width * height, true);
+  tft.endWrite();
+
+  lv_display_flush_ready(disp);
+}
+
+/*
  * Function is called to set the PWM configured to drive the display backlight.
  */
 void setBrightness(int level) {
@@ -345,7 +365,7 @@ void prefsGet(){
   lv_dropdown_set_selected(objects.zone1_dropdown, prefs.getInt("prefZone1"));
   lv_dropdown_set_selected(objects.zone2_dropdown, prefs.getInt("prefZone2"));
 
-  lv_slider_set_value(objects.brightness_slider, prefs.getInt("prefBrightness"), false);
+  lv_slider_set_value(objects.brightness_slider, prefs.getInt("prefBrightness"), LV_ANIM_OFF);
 
   lv_obj_add_state(objects.wifi_time_checkbox,    (lv_state_t)prefs.getBool("prefTimeEnable"));
   lv_obj_add_state(objects.wifi_solar_checkbox,   (lv_state_t)prefs.getBool("prefSolarEnable"));
@@ -546,7 +566,7 @@ static void settings_event_handler(lv_event_t * e) {
   int hours, minutes, seconds;
 
   if(code == LV_EVENT_CLICKED) {
-    lv_obj_set_flag(objects.settings_panel,LV_OBJ_FLAG_HIDDEN,true);
+    lv_obj_add_flag(objects.settings_panel, LV_OBJ_FLAG_HIDDEN);
     lv_calendar_date_t date;
     lv_calendar_get_pressed_date(objects.date_setting_calendar, &date);
 
@@ -577,7 +597,7 @@ static void cancel_event_handler(lv_event_t * e) {
   lv_event_code_t code = lv_event_get_code(e);
 
   if(code == LV_EVENT_CLICKED) {
-    lv_obj_set_flag(objects.settings_panel,LV_OBJ_FLAG_HIDDEN,true);
+    lv_obj_add_flag(objects.settings_panel, LV_OBJ_FLAG_HIDDEN);
   }
 }
 
@@ -606,7 +626,7 @@ static void Timeset_Btn_event_handler(lv_event_t * e) {
   lv_event_code_t code = lv_event_get_code(e);
 
   if(code == LV_EVENT_CLICKED) {
-    lv_obj_set_flag(objects.settings_panel, LV_OBJ_FLAG_HIDDEN, false);
+    lv_obj_clear_flag(objects.settings_panel, LV_OBJ_FLAG_HIDDEN);
     lv_calendar_set_showed_date(objects.date_setting_calendar, ((zone1TM->tm_year)-100)+2000, (zone1TM->tm_mon)+1);
   }
 }
@@ -711,10 +731,14 @@ void setup() {
   //Initialise LVGL GUI
   lv_init();
 
+  //Initialise the TFT after CYD_User_Setup.h has loaded the board-specific pins.
+  tft.begin();
+  tft.setRotation(3);
+
   draw_buf = new uint8_t[DRAW_BUF_SIZE];
-  lv_display_t *disp;
-  disp = lv_tft_espi_create(TFT_HOR_RES, TFT_VER_RES, draw_buf, DRAW_BUF_SIZE);
-  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+  lv_display_t *disp = lv_display_create(TFT_HOR_RES, TFT_VER_RES);
+  lv_display_set_flush_cb(disp, display_flush);
+  lv_display_set_buffers(disp, draw_buf, NULL, DRAW_BUF_SIZE, LV_DISPLAY_RENDER_MODE_PARTIAL);
 
   //Initialize the touchscreen input device driver
   indev = lv_indev_create();
@@ -726,8 +750,8 @@ void setup() {
   strncpy(weatherBuffer, testJSON, strlen(testJSON));
 
   ui_init();
-  lv_obj_set_flag(objects.settings_panel,LV_OBJ_FLAG_HIDDEN,true);
-  lv_obj_set_flag(objects.tools_entry_panel,LV_OBJ_FLAG_HIDDEN,true);
+  lv_obj_add_flag(objects.settings_panel, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(objects.tools_entry_panel, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(objects.wifi_message_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_event_cb(objects.brightness_slider, action_brightness_event_handler, LV_EVENT_RELEASED, (void *)0);
 
@@ -784,7 +808,7 @@ void setup() {
     prefsNeedsUpdate = true;
   }
   if (not prefs.isKey("prefBrightness")) {
-    lv_slider_set_value(objects.brightness_slider, 255, false);
+    lv_slider_set_value(objects.brightness_slider, 255, LV_ANIM_OFF);
     prefsNeedsUpdate = true;
   }
   if (not prefs.isKey("prefTimeEnable")) {

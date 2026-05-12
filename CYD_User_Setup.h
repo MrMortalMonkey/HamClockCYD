@@ -20,7 +20,11 @@
 //   Note that some sketches are designed for a particular TFT pixel width/height
 
 // User defined information reported by "Read_User_Setup" test & diagnostics example
-#define USER_SETUP_INFO "User_Setup"
+#ifndef CYD_USER_SETUP_H
+#define CYD_USER_SETUP_H
+
+#define USER_SETUP_LOADED
+#define USER_SETUP_INFO "ESP32-2432S028 CYD"
 
 // Define to disable all #warnings in library (can be put in User_Setup_Select.h)
 //#define DISABLE_ALL_LIBRARY_WARNINGS
@@ -139,8 +143,8 @@
 // driven with a PWM signal or turned OFF/ON then this must be handled by the user
 // sketch. e.g. with digitalWrite(TFT_BL, LOW);
 
-// ---#define TFT_BL   21            // LED back-light control pin
-// ---#define TFT_BACKLIGHT_ON HIGH  // Level to turn ON back-light (HIGH or LOW)
+#define TFT_BL   21            // LED back-light control pin
+#define TFT_BACKLIGHT_ON HIGH  // Level to turn ON back-light (HIGH or LOW)
 
 
 
@@ -370,7 +374,7 @@
 //#define SPI_FREQUENCY  27000000
 // #define SPI_FREQUENCY  40000000
 //#define SPI_FREQUENCY  55000000 // STM32 SPI1 only (SPI2 maximum is 27MHz)
-#define SPI_FREQUENCY  80000000
+#define SPI_FREQUENCY  40000000
 
 // Optional reduced SPI frequency for reading TFT
 #define SPI_READ_FREQUENCY  20000000
@@ -394,3 +398,5 @@
 // so changing it here has no effect
 
 // #define SUPPORT_TRANSACTIONS
+
+#endif
