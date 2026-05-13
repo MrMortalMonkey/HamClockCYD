@@ -11,3 +11,9 @@ The software is Arduino, using lvgl graphics library to implement the UI. The UI
   3.	Solar Conditions
   4.	Tools – This tab controls various options and settings 
 ![Screenshot](images/HamClock.jpg)
+
+## ESP32-2432S028 CYD build notes
+
+This sketch targets the ESP32-2432S028 CYD with the 320x240 ILI9341 display and XPT2046 touch controller. The project includes local `CYD_User_Setup.h` and `lv_conf.h` files so the display and LVGL settings do not depend on machine-wide Arduino library configuration.
+
+In Arduino IDE, select an ESP32 board profile for your CYD and set **Partition Scheme** to **Huge APP (3MB No OTA/1MB SPIFFS)** before uploading. The default ESP32 partition is too small for the LVGL UI, fonts, WiFi, web server, and HTTPS code.
